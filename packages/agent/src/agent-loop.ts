@@ -41,7 +41,7 @@ export function agentLoop(
 			messages: [...context.messages, ...prompts],
 		};
 
-		stream.push({ type: "agent_start" });
+		stream.push({ type: "agent_start", sessionId: config.sessionId });
 		stream.push({ type: "turn_start" });
 		for (const prompt of prompts) {
 			stream.push({ type: "message_start", message: prompt });
@@ -82,7 +82,7 @@ export function agentLoopContinue(
 		const newMessages: AgentMessage[] = [];
 		const currentContext: AgentContext = { ...context };
 
-		stream.push({ type: "agent_start" });
+		stream.push({ type: "agent_start", sessionId: config.sessionId });
 		stream.push({ type: "turn_start" });
 
 		await runLoop(currentContext, newMessages, config, signal, stream, streamFn);

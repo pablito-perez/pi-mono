@@ -316,7 +316,7 @@ type ResolvedSession =
 	| { type: "path"; path: string } // Direct file path
 	| { type: "local"; path: string } // Found in current project
 	| { type: "global"; path: string; cwd: string } // Found in different project
-	| { type: "not_found"; arg: string }; // Not found anywhere
+	| { type: "create"; id: string }; // Not found - create with this ID
 
 /**
  * Resolve a session argument to a file path.
@@ -345,8 +345,8 @@ async function resolveSessionPath(sessionArg: string, cwd: string, sessionDir?: 
 		return { type: "global", path: match.path, cwd: match.cwd };
 	}
 
-	// Not found anywhere
-	return { type: "not_found", arg: sessionArg };
+	// Not found anywhere - create new session with this ID
+	return { type: "create", id: sessionArg };
 }
 
 /** Prompt user for yes/no confirmation */
@@ -386,19 +386,27 @@ async function createSessionManager(parsed: Args, cwd: string): Promise<SessionM
 				return SessionManager.forkFrom(resolved.path, cwd, parsed.sessionDir);
 			}
 
-			case "not_found":
-				console.error(chalk.red(`No session found matching '${resolved.arg}'`));
-				process.exit(1);
+			case "create": {
+				// Validate the custom ID format
+				if (!/^[a-zA-Z0-9_-]+$/.test(resolved.id)) {
+					console.error(
+						chalk.red("Invalid session ID: must contain only letters, numbers, hyphens, and underscores"),
+					);
+					process.exit(1);
+				}
+				if (resolved.id.length < 3 || resolved.id.length > 64) {
+					console.error(chalk.red("Invalid session ID: must be between 3 and 64 characters"));
+					process.exit(1);
+				}
+				console.log(chalk.dim(`Creating new session with ID: ${resolved.id}`));
+				return SessionManager.create(cwd, parsed.sessionDir, resolved.id);
+			}
 		}
 	}
 	if (parsed.continue) {
 		return SessionManager.continueRecent(cwd, parsed.sessionDir);
 	}
 	// --resume is handled separately (needs picker UI)
-	// If --session-dir provided without --continue/--resume, create new session there
-	if (parsed.sessionDir) {
-		return SessionManager.create(cwd, parsed.sessionDir);
-	}
 	// Default case (new session) returns undefined, SDK will create one
 	return undefined;
 }

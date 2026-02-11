@@ -197,7 +197,7 @@ ${chalk.bold("Options:")}
   --print, -p                    Non-interactive mode: process prompt and exit
   --continue, -c                 Continue previous session
   --resume, -r                   Select a session to resume
-  --session <path>               Use specific session file
+  --session <id|path>            Resume session by ID/path, or create new with custom ID
   --session-dir <dir>            Directory for session storage and lookup
   --no-session                   Don't save session (ephemeral)
   --models <patterns>            Comma-separated model patterns for Ctrl+P cycling

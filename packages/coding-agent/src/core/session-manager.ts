@@ -37,6 +37,7 @@ export interface SessionHeader {
 
 export interface NewSessionOptions {
 	parentSession?: string;
+	customId?: string;
 }
 
 export interface SessionEntryBase {
@@ -202,6 +203,57 @@ function generateId(byId: { has(id: string): boolean }): string {
 	}
 	// Fallback to full UUID if somehow we have collisions
 	return randomUUID();
+}
+
+/**
+ * Validate a custom session ID.
+ * Checks format, length, and collision with existing sessions in the directory.
+ */
+function validateCustomSessionId(customId: string, sessionDir: string): { valid: boolean; error?: string } {
+	// Check format (alphanumeric, hyphen, underscore only)
+	if (!/^[a-zA-Z0-9_-]+$/.test(customId)) {
+		return {
+			valid: false,
+			error: "Session ID must contain only letters, numbers, hyphens, and underscores",
+		};
+	}
+
+	// Check length (reasonable bounds)
+	if (customId.length < 3 || customId.length > 64) {
+		return {
+			valid: false,
+			error: "Session ID must be between 3 and 64 characters",
+		};
+	}
+
+	// Check collision in session directory
+	if (existsSync(sessionDir)) {
+		try {
+			const existingSessions = readdirSync(sessionDir).filter((f) => f.endsWith(".jsonl"));
+
+			for (const file of existingSessions) {
+				try {
+					const content = readFileSync(join(sessionDir, file), "utf8");
+					const firstLine = content.split("\n")[0];
+					if (firstLine) {
+						const header = JSON.parse(firstLine) as SessionHeader;
+						if (header.type === "session" && header.id === customId) {
+							return {
+								valid: false,
+								error: `Session ID "${customId}" already exists in this directory`,
+							};
+						}
+					}
+				} catch {
+					// Skip malformed files
+				}
+			}
+		} catch {
+			// If we can't read the directory, proceed (it will be created)
+		}
+	}
+
+	return { valid: true };
 }
 
 /** Migrate v1 → v2: add id/parentId tree structure. Mutates in place. */
@@ -721,7 +773,17 @@ export class SessionManager {
 	}
 
 	newSession(options?: NewSessionOptions): string | undefined {
-		this.sessionId = randomUUID();
+		// Validate custom ID if provided
+		if (options?.customId) {
+			const validation = validateCustomSessionId(options.customId, this.sessionDir);
+			if (!validation.valid) {
+				throw new Error(`Invalid session ID: ${validation.error}`);
+			}
+			this.sessionId = options.customId;
+		} else {
+			this.sessionId = randomUUID();
+		}
+
 		const timestamp = new Date().toISOString();
 		const header: SessionHeader = {
 			type: "session",
@@ -1242,10 +1304,16 @@ export class SessionManager {
 	 * Create a new session.
 	 * @param cwd Working directory (stored in session header)
 	 * @param sessionDir Optional session directory. If omitted, uses default (~/.pi/agent/sessions/<encoded-cwd>/).
+	 * @param customId Optional custom session ID. If omitted, generates a UUID.
 	 */
-	static create(cwd: string, sessionDir?: string): SessionManager {
+	static create(cwd: string, sessionDir?: string, customId?: string): SessionManager {
 		const dir = sessionDir ?? getDefaultSessionDir(cwd);
-		return new SessionManager(cwd, dir, undefined, true);
+		const manager = new SessionManager(cwd, dir, undefined, true);
+		if (customId) {
+			// Replace the auto-generated session with one using custom ID
+			manager.newSession({ customId });
+		}
+		return manager;
 	}
 
 	/**
