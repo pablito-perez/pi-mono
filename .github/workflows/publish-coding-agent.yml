@@ -1,0 +1,34 @@
+name: publish-coding-agent
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - beta
+    tags:
+      - "pi-coding-agent-v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://npm.pkg.github.com
+          scope: "@pablito-perez"
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm publish --access public --tag "$NPM_TAG"
+        working-directory: packages/coding-agent
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+          NPM_TAG: ${{ github.ref == 'refs/heads/beta' && 'beta' || 'latest' }}

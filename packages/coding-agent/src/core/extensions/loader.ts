@@ -18,9 +18,9 @@ import * as _bundledPiTui from "@mariozechner/pi-tui";
 // These MUST be static so Bun bundles them into the compiled binary.
 // The virtualModules option then makes them available to extensions.
 import * as _bundledTypebox from "@sinclair/typebox";
-import { getAgentDir, isBunBinary } from "../../config.js";
+import { getAgentDir, isBunBinary, PACKAGE_NAME } from "../../config.js";
 // NOTE: This import works because loader.ts exports are NOT re-exported from index.ts,
-// avoiding a circular dependency. Extensions can import from @mariozechner/pi-coding-agent.
+// avoiding a circular dependency. Extensions can import from PACKAGE_NAME.
 import * as _bundledPiCodingAgent from "../../index.js";
 import { createEventBus, type EventBus } from "../event-bus.js";
 import type { ExecOptions } from "../exec.js";
@@ -38,12 +38,14 @@ import type {
 } from "./types.js";
 
 /** Modules available to extensions via virtualModules (for compiled Bun binary) */
+const LEGACY_PACKAGE_NAME = "@mariozechner/pi-coding-agent";
 const VIRTUAL_MODULES: Record<string, unknown> = {
 	"@sinclair/typebox": _bundledTypebox,
 	"@mariozechner/pi-agent-core": _bundledPiAgentCore,
 	"@mariozechner/pi-tui": _bundledPiTui,
 	"@mariozechner/pi-ai": _bundledPiAi,
-	"@mariozechner/pi-coding-agent": _bundledPiCodingAgent,
+	[PACKAGE_NAME]: _bundledPiCodingAgent,
+	[LEGACY_PACKAGE_NAME]: _bundledPiCodingAgent,
 };
 
 const require = createRequire(import.meta.url);
@@ -63,7 +65,8 @@ function getAliases(): Record<string, string> {
 	const typeboxRoot = typeboxEntry.replace(/\/build\/cjs\/index\.js$/, "");
 
 	_aliases = {
-		"@mariozechner/pi-coding-agent": packageIndex,
+		[PACKAGE_NAME]: packageIndex,
+		[LEGACY_PACKAGE_NAME]: packageIndex,
 		"@mariozechner/pi-agent-core": require.resolve("@mariozechner/pi-agent-core"),
 		"@mariozechner/pi-tui": require.resolve("@mariozechner/pi-tui"),
 		"@mariozechner/pi-ai": require.resolve("@mariozechner/pi-ai"),
